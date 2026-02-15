@@ -396,4 +396,13 @@ bot.onText(/\/menu/, (msg) => {
 bot.on('polling_error', (err) => console.error('Poll:', err.code));
 process.on('SIGINT', () => { bot.stopPolling(); process.exit(0); });
 
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Rejection:", err);
+});
+
+
 console.log('🔭 ასტრომანი Bot v2.0 active');

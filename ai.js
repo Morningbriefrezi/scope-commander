@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { SHOP, HUNT_CATEGORIES, CONTENT_TYPES, FILTERS } from './config.js';
+import { SHOP, CATEGORIES, pickRandom, shuffleArray } from './config.js';
 
 let _openai;
 function ai() {
@@ -7,7 +7,7 @@ function ai() {
   return _openai;
 }
 
-async function ask(system, prompt, temp = 0.8, maxTokens = 3000) {
+async function ask(system, prompt, temp = 0.95, maxTokens = 3500) {
   const res = await ai().chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
@@ -20,281 +20,310 @@ async function ask(system, prompt, temp = 0.8, maxTokens = 3000) {
   return res.choices[0].message.content.trim();
 }
 
-async function askJSON(system, prompt, temp = 0.7) {
-  const raw = await ask(system, prompt, temp, 4000);
-  const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-  return JSON.parse(cleaned);
+// ═══════════════════════════════════════
+// SYSTEM PROMPT BASE (Georgian)
+// ═══════════════════════════════════════
+
+const BASE_SYSTEM = `შენ ხარ ${SHOP.name}-ის (Astromani) სოციალური მედიის მენეჯერი და მარკეტინგის ექსპერტი.
+მაღაზია ყიდის: ${SHOP.niche}.
+პლატფორმები: ${SHOP.platforms.join(', ')}.
+სამიზნე აუდიტორია: ${SHOP.targetAudience.join(', ')}.
+
+მნიშვნელოვანი წესები:
+- ყველაფერი დაწერე ქართულად (Georgian language)
+- იყავი კრეატიული, ორიგინალური და თანამედროვე
+- ყოველ ჯერზე სხვადასხვა მიდგომა გამოიყენე
+- არ გაიმეორო წინა პასუხები
+- გამოიყენე ემოჯიები ბუნებრივად
+- ტექსტი უნდა იყოს მზად კოპი-ფეისტისთვის`;
+
+// ═══════════════════════════════════════
+// CONTENT GENERATION (Posts)
+// ═══════════════════════════════════════
+
+export async function generatePost(categoryKey) {
+  const cat = CATEGORIES[categoryKey];
+  if (!cat) return 'კატეგორია ვერ მოიძებნა';
+
+  const angle = pickRandom(cat.angles);
+  const platform = pickRandom(SHOP.platforms);
+  const randomSeed = Math.random().toString(36).slice(2, 8);
+
+  const prompt = `შექმენი 1 მზა სოციალური მედიის პოსტი ${SHOP.name}-სთვის.
+
+კატეგორია: ${cat.name}
+მიდგომა/კუთხე: ${angle}
+პლატფორმა: ${platform}
+უნიკალური სიდი: ${randomSeed}
+
+სტრუქტურა:
+📌 HOOK (პირველი წინადადება რომელიც ყურადღებას იპყრობს)
+📝 ძირითადი ტექსტი (მზა კოპი-ფეისტისთვის, 150-300 სიტყვა)
+🎨 ვიზუალის აღწერა (რა ფოტო/ვიდეო უნდა გადაიღო)
+#️⃣ ჰეშთეგები (15-25 შესაბამისი, ქართული + ინგლისური მიქსი)
+⏰ საუკეთესო დრო გამოსაქვეყნებლად
+💬 CTA (კითხვა ან მოწოდება რომელიც ჩართულობას ზრდის)
+
+მნიშვნელოვანი:
+- ტონი: თანამედროვე, მეგობრული, ენთუზიასტური
+- არ იყოს ზედმეტად სარეკლამო
+- ფოკუსირდი ემოციაზე და გამოცდილებაზე
+- გამოიყენე საკვანძო სიტყვები: ${cat.keywords.join(', ')}
+- ყოველი პოსტი უნდა იყოს უნიკალური და განსხვავებული`;
+
+  return ask(BASE_SYSTEM, prompt);
 }
 
-export async function huntProducts(subNiche = '') {
-  const categories = subNiche
-    ? [subNiche]
-    : HUNT_CATEGORIES.sort(() => Math.random() - 0.5).slice(0, 5);
+// ═══════════════════════════════════════
+// DAILY MARKETING CAMPAIGN
+// ═══════════════════════════════════════
 
-  const prompt = `You are an expert product sourcer for a telescope and astronomy equipment store.
+export async function dailyCampaign(focus = '') {
+  const randomSeed = Math.random().toString(36).slice(2, 8);
+  const dayOfWeek = ['კვირა', 'ორშაბათი', 'სამშაბათი', 'ოთხშაბათი', 'ხუთშაბათი', 'პარასკევი', 'შაბათი'][new Date().getDay()];
 
-Find 8 REAL trending products on AliExpress related to: ${categories.join(', ')}
+  const prompt = `შექმენი დღევანდელი მარკეტინგული კამპანიის გეგმა ${SHOP.name}-სთვის.
 
-Context: The store (${SHOP.name}) sells ${SHOP.niche}. They want to expand their catalog with viral, high-margin products.
+დღეს არის: ${dayOfWeek}, ${new Date().toISOString().split('T')[0]}
+${focus ? `ფოკუსი: ${focus}` : 'ზოგადი — შემოთავაზე საუკეთესო სტრატეგია დღისთვის'}
+უნიკალური სიდი: ${randomSeed}
 
-REQUIREMENTS:
-- Products must ACTUALLY exist on AliExpress
-- Orders > ${FILTERS.MIN_ORDERS}, Rating >= ${FILTERS.MIN_RATING}, Price < $${FILTERS.MAX_PRICE}
-- Focus on products with HIGH MARGIN potential (at least 3x markup possible)
-- Include both core astronomy products AND creative adjacent products
-- Think about what goes viral on TikTok in the astronomy/space niche
+გეგმა უნდა მოიცავდეს:
 
-CRITICAL: prices as decimals (25.99), ratings as decimals (4.7), orders as integers (5200)
+🌅 დილის პოსტი (9:00-11:00)
+- პლატფორმა + ფორმატი
+- მზა ტექსტი (კოპი-ფეისტი)
+- ვიზუალის იდეა
 
-Return JSON array:
-[{
-  "name": "Product name as on AliExpress",
-  "price": 25.99,
-  "orders": 5200,
-  "rating": 4.7,
-  "suggestedRetail": 79.99,
-  "margin": "3.1x",
-  "category": "category",
-  "whyViral": "Why this product is trending",
-  "marketingAngle": "How to sell this to telescope shop customers",
-  "searchQuery": "2-4 word AliExpress search term"
-}]`;
+🌞 შუადღის აქტივობა (13:00-15:00)
+- Stories/Reels იდეა
+- მზა ტექსტი
+- ინტერაქციის ტაქტიკა
 
-  const products = await askJSON(
-    'Product sourcing expert for astronomy retail. Return only valid JSON arrays.',
-    prompt
-  );
+🌙 საღამოს პოსტი (19:00-21:00)
+- პლატფორმა + ფორმატი
+- მზა ტექსტი
+- CTA
 
-  return products.map(p => {
-    let price = parseFloat(p.price) || 0;
-    let rating = parseFloat(p.rating) || 0;
-    if (price > 500) price = price / 100;
-    if (rating > 5) rating = rating / 10;
+📢 დღის სპეციალური აქცია:
+- რა შეთავაზება გავაკეთოთ
+- როგორ ჩამოვაყალიბოთ
+- ურგენტულობის ტაქტიკა
 
-    return {
-      ...p,
-      price,
-      rating,
-      orders: parseInt(p.orders) || 0,
-      suggestedRetail: parseFloat(p.suggestedRetail) || price * 3,
-      link: `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(p.searchQuery || p.name)}`
-    };
+📊 დღის მეტრიკები:
+- რა უნდა გავზომოთ
+- რა არის კარგი შედეგი
+
+ყველაფერი ქართულად, მზა შესასრულებლად.`;
+
+  return ask(BASE_SYSTEM, prompt);
+}
+
+// ═══════════════════════════════════════
+// WEEKLY MARKETING CAMPAIGN
+// ═══════════════════════════════════════
+
+export async function weeklyCampaign(focus = '') {
+  const randomSeed = Math.random().toString(36).slice(2, 8);
+
+  const prompt = `შექმენი 7-დღიანი მარკეტინგული კამპანია ${SHOP.name}-სთვის.
+
+${focus ? `კამპანიის თემა: ${focus}` : 'შემოთავაზე საუკეთესო თემა ამ კვირისთვის'}
+უნიკალური სიდი: ${randomSeed}
+
+თითოეული დღისთვის მიუთითე:
+
+📅 ორშაბათი - კვირა:
+- 🎯 დღის თემა
+- 📱 Instagram პოსტი (მზა ტექსტი + ჰეშთეგები)
+- 🎬 TikTok/Reels სკრიპტი (მზა ტექსტი)
+- 📘 Facebook პოსტი (მზა ტექსტი)
+- 📸 ვიზუალის აღწერა
+- ⏰ გამოქვეყნების დრო
+
+ასევე:
+💰 კვირის აქცია/შეთავაზება:
+- რა პროდუქტი დავაფასდათ
+- ფასდაკლების სტრუქტურა
+- ურგენტულობის ელემენტი
+
+📧 SMS/WhatsApp შეტყობინება (1 ცალი კვირისთვის)
+🤝 თანამშრომლობის იდეა (ვისთან ერთად)
+📊 KPI და წარმატების მეტრიკები
+
+ყველაფერი ქართულად, კონკრეტული და შესრულებადი.`;
+
+  return ask(BASE_SYSTEM, prompt, 0.9, 4000);
+}
+
+// ═══════════════════════════════════════
+// IMAGE GENERATION
+// ═══════════════════════════════════════
+
+export async function generateImage(description) {
+  const useNano = process.env.NANOBANANA_API_KEY && description.includes('nano:');
+  const cleanDesc = description.replace('nano:', '').trim();
+
+  if (useNano) {
+    return generateImageNano(cleanDesc);
+  }
+  return generateImageDalle(cleanDesc);
+}
+
+async function generateImageDalle(description) {
+  const prompt = `Professional product photography for Astromani (ასტრომანი), a telescope and lamp store. 
+${description}. 
+Style: modern, clean, high-end commercial photography, dramatic lighting, Instagram-worthy, 4K quality.
+No text, no watermarks.`;
+
+  const response = await ai().images.generate({
+    model: 'dall-e-3',
+    prompt: prompt,
+    n: 1,
+    size: '1024x1024',
+    quality: 'standard'
   });
+
+  return {
+    url: response.data[0].url,
+    revisedPrompt: response.data[0].revised_prompt,
+    source: 'DALL-E 3'
+  };
 }
 
-export async function generateContent(platform = '', topic = '') {
-  const plat = platform.toLowerCase();
-  const platConfig = CONTENT_TYPES[plat] || CONTENT_TYPES.instagram;
-  const platName = plat || 'instagram';
+async function generateImageNano(description) {
+  const axios = (await import('axios')).default;
+  const response = await axios.post('https://api.nanobanana.com/v1/generate', {
+    prompt: description,
+    style: 'commercial_photo'
+  }, {
+    headers: {
+      'Authorization': `Bearer ${process.env.NANOBANANA_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    timeout: 60000
+  });
 
-  const prompt = `You are a viral social media content creator for ${SHOP.name}, a telescope and astronomy store.
+  return {
+    url: response.data.url || response.data.image_url,
+    revisedPrompt: description,
+    source: 'Nanobanana'
+  };
+}
 
-Create 3 ready-to-post ${platName.toUpperCase()} content pieces${topic ? ` about: ${topic}` : ' for this week'}.
+// ═══════════════════════════════════════
+// VIRAL PRODUCTS (Georgian Market)
+// ═══════════════════════════════════════
 
-Target audience: ${SHOP.targetAudience.join(', ')}
-Content formats to use: ${platConfig.formats.join(', ')}
-Style: ${platConfig.style}
+export async function findViralProducts() {
+  const randomSeed = Math.random().toString(36).slice(2, 8);
 
-For each piece provide:
-1. HOOK (first line / first 2 seconds that stops the scroll)
-2. FULL CAPTION/SCRIPT (ready to copy-paste)
-3. HASHTAGS (${platName === 'tiktok' ? '5-8' : platName === 'instagram' ? '20-30' : '5-10'} relevant hashtags)
-4. VISUAL DIRECTION (what image/video to create)
-5. BEST TIME TO POST
-6. ENGAGEMENT CTA (question or call to action)
+  const prompt = `შენ ხარ ქართული ბაზრის ანალიტიკოსი და პროდუქტების მკვლევარი.
 
-Make content that gets shared. Think: educational, surprising, emotional, or entertaining.
-Tie everything back to telescopes and astronomy WITHOUT being salesy.`;
+გააანალიზე ქართული ონლაინ მაღაზიები (Mymarket.ge, Extra.ge, Zoommer.ge, Vendoo.ge) და მოძებნე 8-10 ვირუსული/ტრენდული პროდუქტი რომელიც ${SHOP.name}-ს კატალოგში კარგად მოერგება.
+
+უნიკალური სიდი: ${randomSeed}
+
+კატეგორიები: ტელესკოპები, ლამპები, ლევიტაციური ლამპები, საბავშვო სათამაშოები, გაჯეტები, LED განათება, კოსმოსური თემატიკა, STEM სათამაშოები.
+
+თითოეული პროდუქტისთვის მიუთითე:
+
+1. 📦 პროდუქტის სახელი (ქართულად)
+2. 💰 სავარაუდო ფასი ქართულ ბაზარზე (ლარში)
+3. 📊 მოთხოვნის დონე (მაღალი/საშუალო/დაბალი)
+4. 🏪 სად იყიდება ახლა (რომელ საიტზე)
+5. 💡 რატომ არის ტრენდული
+6. 🎯 მარკეტინგის კუთხე (როგორ გავყიდოთ)
+7. 💵 სავარაუდო მარჟა
+8. 🔗 AliExpress ძიების ტერმინი (იაფად შესაძენად)
+
+ასევე მიუთითე:
+⭐ ტოპ 3 საუკეთესო შესაძლებლობა (რატომ ეს 3?)
+⚠️ რისკები (რას უნდა მივაქციოთ ყურადღება?)
+📈 ტრენდის პროგნოზი (რა იქნება პოპულარული მომდევნო თვეში?)
+
+იყავი კონკრეტული, რეალისტური და აქტუალური.`;
 
   return ask(
-    `Viral ${platName} content creator for astronomy brand. Write ready-to-use content.`,
+    'შენ ხარ ქართული ე-კომერციის ექსპერტი. იცნობ ადგილობრივ ბაზარს, ფასებს და ტრენდებს. პასუხობ მხოლოდ ქართულად.',
     prompt,
-    0.9,
+    0.85,
     4000
   );
 }
 
-export async function getAstroEvents() {
-  const prompt = `You are an astronomy events expert and retail marketing strategist for a telescope shop.
+// ═══════════════════════════════════════
+// COMPETITOR ANALYSIS (Georgian Market)
+// ═══════════════════════════════════════
 
-List the next 10 significant astronomy events coming up (from today forward for the next 3 months).
+export async function georgianCompetitorAnalysis() {
+  const randomSeed = Math.random().toString(36).slice(2, 8);
 
-For each event provide:
-1. EVENT NAME and exact DATE
-2. VISIBILITY (where best visible, what equipment needed)
-3. EXCITEMENT LEVEL (fire emoji 1 to 5)
-4. SALES OPPORTUNITY: which products to promote and why
-5. CONTENT IDEA: one viral social media post concept tied to this event
-6. TIMING: when to start marketing (how many days before)
+  const prompt = `გააანალიზე ქართული ბაზარი ტელესკოპების, ლამპებისა და საბავშვო სათამაშოების სეგმენტში.
 
-Focus on events that DRIVE TELESCOPE SALES:
-- Meteor showers, eclipses, planetary conjunctions
-- Supermoons, blood moons, comets
-- ISS visible passes, satellite launches
-- Seasonal stargazing highlights
+უნიკალური სიდი: ${randomSeed}
 
-End with a "THIS WEEK'S #1 PRIORITY" — the most urgent event to prepare for.`;
+მოამზადე ანალიზი:
+
+🏪 კონკურენტები საქართველოში:
+- ვინ ყიდის მსგავს პროდუქტებს?
+- რა ფასები აქვთ?
+- სად რეკლამირდებიან?
+- რა აკეთებენ კარგად/ცუდად?
+
+📊 ბაზრის გაპები:
+- რა პროდუქტები არ არის ბაზარზე?
+- რა სერვისი აკლია მომხმარებელს?
+- რომელი აუდიტორია ვერ პოულობს სასურველს?
+
+🎯 ${SHOP.name}-ს შესაძლებლობები:
+- 5 კონკრეტული ნაბიჯი კონკურენტული უპირატესობისთვის
+- უნიკალური პოზიციონირების სტრატეგია
+- ფასწარმოქმნის რეკომენდაცია
+
+⚡ სწრაფი მოქმედებები (ამ კვირისთვის):
+- 3 რამ რაც დღეს შეგიძლია გააკეთო
+
+ყველაფერი ქართულად, კონკრეტულად და აქტუალურად.`;
 
   return ask(
-    'Astronomy events expert and telescope retail strategist. Be specific with dates and actionable advice.',
+    'შენ ხარ ქართული ბაზრის ანალიტიკოსი. იცნობ ადგილობრივ ბიზნეს გარემოს. პასუხობ მხოლოდ ქართულად.',
     prompt,
-    0.5,
+    0.7,
     4000
   );
 }
 
-export async function createCampaign(product = '') {
-  const prompt = `You are a senior marketing strategist for ${SHOP.name}, a telescope and astronomy store selling via physical store, online store, and social media.
+// ═══════════════════════════════════════
+// BUSINESS IDEAS (Georgian)
+// ═══════════════════════════════════════
 
-Create a FULL 7-DAY MARKETING CAMPAIGN for: ${product || 'their best-selling beginner telescope'}
+export async function businessIdeas(focus = '') {
+  const randomSeed = Math.random().toString(36).slice(2, 8);
 
-Include:
+  const prompt = `შემოთავაზე 7 ინოვაციური ბიზნეს იდეა ${SHOP.name}-სთვის.
 
-DAY-BY-DAY PLAN:
-- What to post on Instagram, TikTok, and Facebook each day
-- Exact captions and hooks (ready to copy)
-- When to post (time)
+${focus ? `ფოკუსი: ${focus}` : ''}
+უნიკალური სიდი: ${randomSeed}
 
-SALES STRATEGY:
-- Pricing psychology (anchor price, discount structure)
-- Urgency/scarcity tactics
-- Bundle suggestions (what to pair with)
-- Upsell and cross-sell recommendations
+თითოეული იდეისთვის:
+💡 იდეის სახელი
+📝 აღწერა (2-3 წინადადება)
+🎯 რატომ იმუშავებს საქართველოში
+⚡ სირთულის დონე (დაბალი/საშუალო/მაღალი)
+💰 საჭირო ბიუჯეტი
+📈 მოსალოდნელი შედეგი
+🔧 პირველი ნაბიჯი (30 წუთში გასაკეთებელი)
 
-AD STRATEGY:
-- Target audience segments for paid ads
-- Ad copy (3 variations)
-- Budget allocation suggestion (small budget: $10-50/day)
+იდეები უნდა მოიცავდეს:
+- ახალი შემოსავლის წყაროები
+- ვირუსული მარკეტინგი
+- საზოგადოების შექმნა
+- პარტნიორობა
+- სეზონური შესაძლებლობები
+- ონლაინ/ოფლაინ ინტეგრაცია
 
-OUTREACH:
-- Email subject lines (3 options)
-- In-store signage text
-- WhatsApp/SMS broadcast message
+იყავი კრეატიული! არ შემოთავაზო ბანალური რჩევები. ფიქრე ქართული კონტექსტით.`;
 
-SUCCESS METRICS:
-- What to track
-- Expected engagement benchmarks
-
-Make it specific, actionable, and ready to execute TODAY.`;
-
-  return ask(
-    'Senior marketing strategist for astronomy retail. Create detailed, immediately executable campaigns.',
-    prompt,
-    0.8,
-    4000
-  );
-}
-
-export async function getBusinessIdeas(focus = '') {
-  const prompt = `You are a creative business strategist for ${SHOP.name}, a telescope and astronomy equipment retailer with physical store, online store (Shopify), and social media presence (Instagram, TikTok, Facebook).
-
-${focus ? `Focus area: ${focus}` : 'Generate a mix of ideas across all areas.'}
-
-Their #1 challenge: GETTING NEW CUSTOMERS.
-
-Provide 7 ACTIONABLE ideas:
-
-For each idea:
-- IDEA NAME (catchy, memorable)
-- DESCRIPTION (2-3 sentences max)
-- WHY IT WORKS (the psychology behind it)
-- EFFORT LEVEL (low/medium/high)
-- COST (free / under $50 / under $200 / custom)
-- EXPECTED IMPACT (customer reach estimate)
-- FIRST STEP (what to do in the next 30 minutes)
-
-Mix of ideas across:
-- Customer acquisition channels
-- Viral content strategies
-- Community building
-- Partnership opportunities
-- Seasonal/event-based promotions
-- Customer retention and referral
-- Revenue diversification
-
-Be CREATIVE. Think outside the box. No generic advice.
-Include at least one idea that could go VIRAL.`;
-
-  return ask(
-    'Creative business strategist for niche retail. Deliver specific, innovative, actionable ideas.',
-    prompt,
-    0.95,
-    4000
-  );
-}
-
-export async function analyzeCompetitors() {
-  const prompt = `You are a competitive intelligence analyst for a telescope and astronomy equipment store.
-
-Analyze the current competitive landscape for telescope retailers. Cover:
-
-TOP ONLINE COMPETITORS:
-- List 5-7 major telescope retailers (online) with what they do well
-- Their pricing strategies
-- Their social media strengths/weaknesses
-
-MARKET GAPS:
-- What are customers complaining about in this niche?
-- What products/services are MISSING from the market?
-- Underserved customer segments
-
-WHAT'S WORKING NOW:
-- Top performing content types in the astronomy niche
-- Trending marketing tactics competitors are using
-- New product categories gaining traction
-
-OPPORTUNITIES TO EXPLOIT:
-- 5 specific things competitors are NOT doing that you should
-- Positioning strategies to differentiate
-- Price/value gaps to fill
-
-QUICK WINS:
-- 3 things you can implement THIS WEEK to gain an edge
-
-Be specific with real competitors and real observations.`;
-
-  return ask(
-    'Competitive intelligence analyst for astronomy retail market. Be specific, name real companies.',
-    prompt,
-    0.6,
-    4000
-  );
-}
-
-export async function weeklyBriefing() {
-  const prompt = `You are the AI chief strategy officer for ${SHOP.name}, a telescope and astronomy store.
-
-Deliver a WEEKLY BUSINESS INTELLIGENCE BRIEFING covering:
-
-INDUSTRY NEWS:
-- What happened this week in astronomy/space that affects telescope sales
-- New product launches or announcements in the optics industry
-
-TRENDING NOW:
-- What's trending on TikTok/Instagram in the astronomy space
-- Viral content opportunities to jump on THIS WEEK
-
-UPCOMING EVENTS (next 2 weeks):
-- Astronomy events to prepare content/marketing for
-- Retail events (sale opportunities)
-
-RECOMMENDED ACTIONS (prioritized):
-1. URGENT (do today)
-2. THIS WEEK (by Sunday)
-3. PLAN AHEAD (next 2 weeks)
-
-WILD CARD IDEA:
-- One unexpected strategy that could be a game changer this week
-
-CONTENT CALENDAR:
-- Mon through Sun: one post idea per day with platform + format + hook
-
-Keep it under 500 words. Punchy. Actionable. No fluff.`;
-
-  return ask(
-    'AI chief strategy officer for astronomy retail. Deliver concise, actionable weekly briefing.',
-    prompt,
-    0.8,
-    4000
-  );
+  return ask(BASE_SYSTEM, prompt, 0.95, 4000);
 }

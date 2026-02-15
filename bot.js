@@ -1,3 +1,9 @@
+import http from 'http';
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('🔭 Scope Commander is running');
+}).listen(process.env.PORT || 10000);
+
 import 'dotenv/config';
 import TelegramBot from 'node-telegram-bot-api';
 import {

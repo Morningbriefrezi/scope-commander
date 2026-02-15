@@ -1,16 +1,16 @@
-services:
-  - type: web
-    name: scope-commander
-    runtime: node
-    plan: free
-    buildCommand: npm install
-    startCommand: node bot.js
-    envVars:
-      - key: TELEGRAM_BOT_TOKEN
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: AUTHORIZED_USERS
-        sync: false
-      - key: SHOP_NAME
-        sync: false
+{
+  "name": "astromani-bot",
+  "version": "2.0.0",
+  "description": "ასტრომანი - AI Business Companion Bot",
+  "type": "module",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "node-telegram-bot-api": "^0.66.0",
+    "openai": "^4.52.0"
+  }
+}

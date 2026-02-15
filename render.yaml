@@ -14,11 +14,3 @@ services:
         sync: false
       - key: SHOP_NAME
         sync: false
-```
-
----
-
-**File: `.gitignore`**
-```
-node_modules/
-.env

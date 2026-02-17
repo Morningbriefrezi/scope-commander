@@ -277,3 +277,33 @@ ${focus ? `ფოკუსი: ${focus}` : ''}
 
   return ask(`${STRICT_GEO} ${BASE_SYSTEM}`, prompt, 0.95, 4000);
 }
+export async function todayInSpaceHistory() {
+  const today = new Date();
+
+  const formatted = today.toLocaleDateString('ka-GE', {
+    day: 'numeric',
+    month: 'long'
+  });
+
+  const SYSTEM = `
+შენ ხარ ასტრონომიის ისტორიკოსი.
+წერე 2-4 აბზაცი.
+არ გამოიყენო პუნქტები.
+არ გადააჭარბო 400 სიტყვას.
+მხოლოდ ქართულად.
+`;
+
+  const prompt = `
+შექმენი პოსტი თემაზე:
+
+"დღეს კოსმოსის ისტორიაში — ${formatted}"
+
+მიუთითე რეალური ისტორიული მოვლენა ამ თარიღთან დაკავშირებით.
+თუ კონკრეტულ თარიღზე მნიშვნელოვანი მოვლენა არ იყო,
+მიუთითე ამ კვირაში მომხდარი მნიშვნელოვანი კოსმოსური მოვლენა.
+
+საინტერესო, ინფორმაციული და მარტივად წასაკითხი.
+`;
+
+  return ask(SYSTEM, prompt, 0.85, 600);
+}
